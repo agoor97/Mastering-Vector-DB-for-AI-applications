@@ -1,0 +1,9 @@
+qdrant-client==1.4.0
+openai
+fastapi==0.95.1
+uvicorn==0.20.0
+sentence_transformers==2.2.2
+pandas==2.0.3
+python-dotenv
+tqdm
+python-multipart

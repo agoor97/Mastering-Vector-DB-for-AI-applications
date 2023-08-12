@@ -9,7 +9,7 @@ from torchvision import transforms
 from PIL import Image
 from dotenv import load_dotenv
 from qdrant_client import QdrantClient
-from qdrant_client.http.models import VectorParams, Distance, Batch, PointIdsList, PointStruct
+from qdrant_client.http.models import PointIdsList, PointStruct
 
 ## Load dotenv file
 _ = load_dotenv(override=True)
@@ -174,7 +174,7 @@ def delete_vectorDB(image_id: int):
     
     Args:
     *****
-        (images_ids: int) --> The provided image id to be delete.
+        (image_id: int) --> The provided image id to be delete.
 
     Returns: 
         Only a small message with the new count of points after deleting.
