@@ -1,4 +1,4 @@
-pinecone-client==2.2.
+qdrant-client==1.4.0
 fastapi==0.95.1
 uvicorn==0.20.0
 pandas==2.0.3
