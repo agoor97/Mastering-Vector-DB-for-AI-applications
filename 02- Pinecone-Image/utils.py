@@ -112,7 +112,7 @@ def extract_images_features(images_paths: list):
 
 
 ## ------------------------------------- Search Pinecone VectorDB --------------------------------- ##
-def search_vectorDB(image_url: str, folder_path: str, top_k: int, threshold: float=None):
+def search_vectorDB(image_url: str, folder_path: str, top_k: int, threshold: float=None, class_type: str=None):
     ''' This Function is to use the pinecone index to make a query and retrieve similar records.
     Args:
     *****
@@ -120,6 +120,7 @@ def search_vectorDB(image_url: str, folder_path: str, top_k: int, threshold: flo
         (folder_path: str) --> The folder path in which the image will be downloaded. 
         (top_k: int) --> The number required of similar records in descending order.
         (threshold: float) --> The threshold to filter the retrieved IDs based on it.
+        (class_type: str) --> Which class type to be used for filtering.
     
     Returns:
     *******
@@ -133,18 +134,27 @@ def search_vectorDB(image_url: str, folder_path: str, top_k: int, threshold: flo
         ## Call the function (extract_images_features) --> Feature Extraction
         image_features = extract_images_features(images_paths=[image_path_local])[0]
 
-        ## Search pinecone
-        results = index.query(vector=image_features, top_k=top_k)['matches']
+        if class_type in ['class-a', 'class-b']:
+            ## Search pinecone
+            results = index.query(queries=[image_features], top_k=top_k, 
+                                  include_metadata=True, filter={'class': class_type}, 
+                                  namespace='image-vgg19')['results'][0]['matches']
+        else:
+            ## Search pinecone
+            results = index.query(queries=[image_features], top_k=top_k, 
+                                  include_metadata=True, namespace='image-vgg19')['results'][0]['matches']
 
         ## Filter the output if there is a threshold given
-        if threshold is not None:
+        if threshold:
             ## Exatract IDs with scores
-            similar_records = [{'id': int(record['id']), 'score': float(record['score'])} \
+            similar_records = [{'id': int(record['id']), 'score': float(record['score']), 'class': record['metadata']['class']}
                                 for record in results if float(record['score']) > threshold]       
         ## No Filtering
         else:
+            print('hhhhh')
             ## Exatract IDs with scores
-            similar_records = [{'id': int(record['id']), 'score': float(record['score'])} for record in results]
+            similar_records = [{'id': int(record['id']), 'score': float(record['score']), 'class': record['metadata']['class']} 
+                                for record in results]
         
         return similar_records
 
@@ -155,7 +165,7 @@ def search_vectorDB(image_url: str, folder_path: str, top_k: int, threshold: flo
 
 
 ## ------------------------------------------ Upsert New Data to Pinecone --------------------------------------------- ##
-def insert_vectorDB(image_id: int, image_url: str, folder_path: str):
+def insert_vectorDB(image_id: int, image_url: str, folder_path: str, class_type: str):
     ''' This Function is to index the new images using the provided image id and link.
    
     Args:
@@ -163,6 +173,7 @@ def insert_vectorDB(image_id: int, image_url: str, folder_path: str):
         (image_id: int) --> The provided image id to be renamed with it.
         (image_url: str) --> The provided image link to be downloaded.
         (folder_path: str) --> The folder path to download the image on it.
+        (class_type: str) --> Which class type to be used for filtering.
 
     Returns:
     ********
@@ -176,10 +187,10 @@ def insert_vectorDB(image_id: int, image_url: str, folder_path: str):
         image_features = extract_images_features(images_paths=[new_image_path_local])[0]
 
         ## Upsert to pinecone
-        to_upsert = list(zip([str(image_id)], [image_features]))
+        to_upsert = [(str(image_id), image_features, {'class': class_type})]
 
         ## Insert to pinecone
-        _ = index.upsert(vectors=to_upsert)
+        _ = index.upsert(vectors=to_upsert, namespace='image-vgg19')
 
         ## Get the count of vector after upserting
         count_after = index.describe_index_stats()['total_vector_count']
@@ -196,7 +207,7 @@ def delete_vectorDB(image_id: int):
 
     try:
         ## Delete from Vector DB
-        _ = index.delete(ids=[str(image_id)])
+        _ = index.delete(ids=[str(image_id)], namespace='image-vgg19')
 
         ## Get the count of vector after upserting
         count_after = index.describe_index_stats()['total_vector_count']

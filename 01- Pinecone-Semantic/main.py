@@ -32,15 +32,16 @@ async def semantic_search(search_text: str=Form(...), top_k: int=Form(100),
 ## ---------------------------------- Endpoint for Updates ------------------------------------------- ##
 @app.post('/upserting_or_deleting')
 async def upserting_or_deleting(new_text_id: int=Form(...), new_text: str=Form(None), 
+                                class_type: str=Form(None, description='class_type', enum=['class-a', 'class-b']),
                                 case: str=Form(..., description='case', enum=['upsert', 'delete'])):
 
     ## Validate the new_text is not None if the case=upsert
-    if case == 'upsert' and not new_text:
-        raise HTTPException(status_code=400, detail='"new_text" is mandatory for case "upsert".')
+    if case == 'upsert' and (not new_text or not class_type):
+        raise HTTPException(status_code=400, detail='"new_text & class_type" is mandatory for case "upsert".')
     
     ## For Upserting
     if case == 'upsert':
-        message = insert_vectorDB(text_id=new_text_id, text=new_text)
+        message = insert_vectorDB(text_id=new_text_id, text=new_text, class_type=class_type)
     
     ## For Deleting
     elif case == 'delete':

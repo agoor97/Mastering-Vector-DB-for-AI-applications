@@ -104,7 +104,6 @@ def search_vectDB(query_text: str, top_k: int, threshold: float=None, class_type
                                   filter={'class': class_type}, namespace='semantic-huggingface', include_metadata=True)
             results = results['results'][0]['matches']
         else: 
-            print('here 1')
             ## Search in pinecone without filtering
             results = index.query(queries=[query_embedding], top_k=top_k, namespace='semantic-huggingface', include_metadata=True)
             results = results['results'][0]['matches']
@@ -118,7 +117,6 @@ def search_vectDB(query_text: str, top_k: int, threshold: float=None, class_type
        
         ## No Filtering
         else:
-            print('here 2')
             ## Exatract IDs with scores
             similar_records = [{'id': int(record['id']), 'score': float(record['score']), 'class': record['metadata']['class']} for record in results]
 
@@ -130,7 +128,7 @@ def search_vectDB(query_text: str, top_k: int, threshold: float=None, class_type
 
 
 ## ------------------------------------ Upsert New Data to Pinecone --------------------------------------- ##
-def insert_vectorDB(text_id: int, text: str):
+def insert_vectorDB(text_id: int, text: str, class_type: str):
 
     try:
         ## You can tranaslate if you want ..
@@ -139,10 +137,10 @@ def insert_vectorDB(text_id: int, text: str):
         embeds_new = model_hugging.encode(text).tolist()
 
         ## Prepare to pinecone 
-        to_upsert = list(zip([str(text_id)], [embeds_new]))
+        to_upsert = [(str(text_id), embeds_new, {'class': class_type})]
 
         ## Insert to pinecone
-        _ = index.upsert(vectors=to_upsert)
+        _ = index.upsert(vectors=to_upsert, namespace='semantic-huggingface')
 
         ## Get the count of vector after upserting
         count_after = index.describe_index_stats()['total_vector_count']
@@ -159,7 +157,7 @@ def delete_vectorDB(text_id: int):
 
     try:
         ## Delete from Vector DB
-        _ = index.delete(ids=[str(text_id)])
+        _ = index.delete(ids=[str(text_id)], namespace='semantic-huggingface')
 
         ## Get the count of vector after upserting
         count_after = index.describe_index_stats()['total_vector_count']
