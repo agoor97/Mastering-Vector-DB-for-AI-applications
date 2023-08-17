@@ -16,7 +16,7 @@ openai_key = os.getenv('OPENAI_API_KEY')
 openai.api_key = openai_key
 
 ## Connect to Pinecone Index
-index_name = 'semantic-huggingface-course'
+index_name = 'semantic-huggingface-model-course'
 pinecone.init(
     api_key=pinecone_key,
     environment=pinecone_env
@@ -78,13 +78,14 @@ def translate_to_english_gpt(user_prompt: str):
 
 
 ## ------------------------------------- Getting Similar IDs using pinecone ------------------------------------ ##
-def search_vectDB(query_text: str, top_k: int, threshold: float=None):
+def search_vectDB(query_text: str, top_k: int, threshold: float=None, class_type: str=None):
     ''' This Function is to use the pinecone index to make a query and retrieve similar records.
     Args:
     *****
         (query_text: str) --> The query text to get similar records to it.
         (top_k: int) --> The number required of similar records in descending order.
         (threshold: float) --> The threshold to filter the retrieved IDs based on it.
+        (class_type: str) --> Which class to filter using it (class-a or class-b)
     
     Returns:
     *******
@@ -97,22 +98,30 @@ def search_vectDB(query_text: str, top_k: int, threshold: float=None):
         ## Get Embeddings of the input query
         query_embedding = model_hugging.encode(query_translated).tolist()
 
-        ## Search in pinecone
-        results = index.query(queries=[query_embedding], top_k=top_k)
-        results = results['results'][0]['matches']
+        if class_type in ['class-a', 'class-b']:
+            ## Search in pinecone with filtering using class_type
+            results = index.query(queries=[query_embedding], top_k=top_k, 
+                                  filter={'class': class_type}, namespace='semantic-huggingface', include_metadata=True)
+            results = results['results'][0]['matches']
+        else: 
+            print('here 1')
+            ## Search in pinecone without filtering
+            results = index.query(queries=[query_embedding], top_k=top_k, namespace='semantic-huggingface', include_metadata=True)
+            results = results['results'][0]['matches']
 
         
         ## Filter the output if there is a threshold given
-        if threshold is not None:
+        if threshold: 
             ## Exatract IDs with scores
-            similar_records = [{'id': int(record['id']), 'score': float(record['score'])} \
+            similar_records = [{'id': int(record['id']), 'score': float(record['score']), 'class': record['metadata']['class']} \
                                for record in results if float(record['score']) > threshold]
-        
+       
         ## No Filtering
         else:
+            print('here 2')
             ## Exatract IDs with scores
-            similar_records = [{'id': int(record['id']), 'score': float(record['score'])} for record in results]
-        
+            similar_records = [{'id': int(record['id']), 'score': float(record['score']), 'class': record['metadata']['class']} for record in results]
+
         return similar_records
     
     except Exception as e:

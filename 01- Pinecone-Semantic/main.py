@@ -10,7 +10,8 @@ app = FastAPI(debug=True)
 
 ## ---------------------------------- Endpoint for Searching ------------------------------------------- ##
 @app.post('/semantic_search')
-async def semantic_search(search_text: str=Form(...), top_k: int=Form(100), threshold: float=Form(None)):
+async def semantic_search(search_text: str=Form(...), top_k: int=Form(100), 
+                          threshold: float=Form(None), class_type: str=Form(..., description='class_type', enum=['All', 'class-a', 'class-b'])):
 
     ## Validation for top_k, and threshold
     if top_k <= 0 or not isinstance(top_k, int) or top_k > 10000 or top_k is None:
@@ -22,7 +23,7 @@ async def semantic_search(search_text: str=Form(...), top_k: int=Form(100), thre
 
     else:
         ## Get Similar Records --> Call the (search_vectDB) from utils.py
-        similar_records = search_vectDB(query_text=search_text, top_k=top_k, threshold=threshold)
+        similar_records = search_vectDB(query_text=search_text, top_k=top_k, threshold=threshold, class_type=class_type)
 
         return similar_records
     
