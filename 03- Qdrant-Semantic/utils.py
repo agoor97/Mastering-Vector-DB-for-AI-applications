@@ -5,12 +5,13 @@ from sentence_transformers import SentenceTransformer
 from fastapi import HTTPException
 import openai
 from qdrant_client import QdrantClient
-from qdrant_client.http.models import PointStruct, PointIdsList
+from qdrant_client.http.models import PointStruct, PointIdsList, Filter, FieldCondition, MatchValue
 
 ## Load dotenv file
 _ = load_dotenv(override=True)
 qdrant_key = os.getenv('QDRANT_API_KEY')
 qdrant_url = os.getenv('QDRANT_URL')
+collec_name = 'semantic-search-course'
 
 ## Assign OpenAI Key
 openai.api_key = os.getenv('OPENAI_API_KEY')
@@ -72,13 +73,14 @@ def translate_to_english_gpt(user_prompt: str):
 
 
 ## ------------------------------------- Getting Similar IDs using Qdrant ------------------------------------ ##
-def search_vectDB(query_text: str, top_k: int, threshold: float=None):
+def search_vectDB(query_text: str, top_k: int, threshold: float=None, class_type: str=None):
     ''' This Function is to use the Qdrant index to make a query and retrieve similar records.
     Args:
     *****
         (query_text: str) --> The query text to get similar records to it.
         (top_k: int) --> The number required of similar records in descending order.
         (threshold: float) --> The threshold to filter the retrieved IDs based on it.
+        (class_type: str) --> Which class to search in, To be used for filteration.
     
     Returns:
     *******
@@ -91,11 +93,18 @@ def search_vectDB(query_text: str, top_k: int, threshold: float=None):
         ## Get Embeddings of the input query
         query_embedding = model_hugging.encode(query_translated).tolist()
 
-        ## Search in qdrant
-        results = client.search(collection_name='semantic-search-course', query_vector=query_embedding, limit=top_k, score_threshold=threshold)
-
+        if class_type in ['class-a', 'class-b']:
+            ## Search in qdrant with filteration using class_type
+            results = client.search(collection_name=collec_name, query_vector=query_embedding, 
+                                    limit=top_k, score_threshold=threshold,
+                                    query_filter=Filter(must=[FieldCondition(key='class', match=MatchValue(value=class_type))]))
+        else:
+            ## Search in qdrant without filteration using class_type
+             results = client.search(collection_name=collec_name, query_vector=query_embedding, 
+                                    limit=top_k, score_threshold=threshold)
+      
         ## Take only the id and score
-        results = [{'id': point.id, 'score': float(point.score)} for point in results]
+        results = [{'id': int(point.id), 'score': float(point.score), 'class': point.payload['class']} for point in results]
 
         return results
     
@@ -105,13 +114,14 @@ def search_vectDB(query_text: str, top_k: int, threshold: float=None):
 
 
 ## ------------------------------------ Upsert New Data to Qdrant --------------------------------------- ##
-def insert_vectorDB(text_id: int, text: str):
+def insert_vectorDB(text_id: int, text: str, class_type: str):
     ''' This Function is to index the new images using the provided image id and link.
    
     Args:
     *****
         (text_id: int) --> The provided text id to be inserted to Qdrant DB.
         (text: str) --> The provided text to be inserted.
+        (class_type: str) --> Which class to index with, To be used as metadata for later filteration.
 
     Returns:
     ********
@@ -126,12 +136,12 @@ def insert_vectorDB(text_id: int, text: str):
         embeds_new = model_hugging.encode(text).tolist()
 
         ## Insert to Qdrant
-        _ = client.upsert(collection_name='semantic-search-course', 
+        _ = client.upsert(collection_name=collec_name, 
                           wait=True, 
-                          points=[PointStruct(id=text_id, vector=embeds_new)])
+                          points=[PointStruct(id=text_id, vector=embeds_new, payload={'class': class_type})])
 
         ## Check count after Upserting
-        count_after_upsert = client.get_collection(collection_name='semantic-search-course').vectors_count
+        count_after_upsert = client.get_collection(collection_name=collec_name).vectors_count
 
         return f'Upserting Done: Count Now is {count_after_upsert} vectors.'
     
@@ -154,10 +164,10 @@ def delete_vectorDB(text_id: int):
 
     try:
         ## Delete from Vector DB
-        _ = client.delete(collection_name='semantic-search-course', points_selector=PointIdsList(points=[text_id]))
+        _ = client.delete(collection_name=collec_name, points_selector=PointIdsList(points=[text_id]))
    
         ## Check count after Deleting
-        count_after_delete = client.get_collection(collection_name='semantic-search-course').vectors_count
+        count_after_delete = client.get_collection(collection_name=collec_name).vectors_count
 
         return f'Deleting Done: Count Now is {count_after_delete} vectors.'
     

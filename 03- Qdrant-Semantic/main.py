@@ -10,7 +10,8 @@ app = FastAPI(debug=True)
 
 ## ---------------------------------- Endpoint for Searching ------------------------------------------- ##
 @app.post('/semantic_search')
-async def semantic_search(search_text: str=Form(...), top_k: int=Form(100), threshold: float=Form(None)):
+async def semantic_search(search_text: str=Form(...), top_k: int=Form(...), threshold: float=Form(None), 
+                          class_type: str=Form(..., description='class_type', enum=['All', 'class-a', 'class-b'])):
 
     ## Validation for top_k, and threshold
     if top_k <= 0 or not isinstance(top_k, int) or top_k > 10000 or top_k is None:
@@ -22,7 +23,7 @@ async def semantic_search(search_text: str=Form(...), top_k: int=Form(100), thre
 
     else:
         ## Get Similar Records --> Call the (search_vectDB) from utils.py
-        similar_records = search_vectDB(query_text=search_text, top_k=top_k, threshold=threshold)
+        similar_records = search_vectDB(query_text=search_text, top_k=top_k, threshold=threshold, class_type=class_type)
 
         return similar_records
     
@@ -31,15 +32,16 @@ async def semantic_search(search_text: str=Form(...), top_k: int=Form(100), thre
 ## ---------------------------------- Endpoint for Updates ------------------------------------------- ##
 @app.post('/upserting_or_deleting')
 async def upserting_or_deleting(new_text_id: int=Form(...), new_text: str=Form(None), 
+                                class_type: str=Form(None, description='class_type', enum=['class-a', 'class-b']),
                                 case: str=Form(..., description='case', enum=['upsert', 'delete'])):
 
     ## Validate the new_text is not None if the case=upsert
-    if case == 'upsert' and not new_text:
-        raise HTTPException(status_code=400, detail='"new_text" is mandatory for case "upsert".')
+    if case == 'upsert' and (not new_text or not class_type):
+        raise HTTPException(status_code=400, detail='"new_text & class_type" are mandatory for case "upsert".')
     
     ## For Upserting
     if case == 'upsert':
-        message = insert_vectorDB(text_id=new_text_id, text=new_text)
+        message = insert_vectorDB(text_id=new_text_id, text=new_text, class_type=class_type)
     
     ## For Deleting
     elif case == 'delete':
