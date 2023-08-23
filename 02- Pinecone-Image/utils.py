@@ -151,7 +151,6 @@ def search_vectorDB(image_url: str, folder_path: str, top_k: int, threshold: flo
                                 for record in results if float(record['score']) > threshold]       
         ## No Filtering
         else:
-            print('hhhhh')
             ## Exatract IDs with scores
             similar_records = [{'id': int(record['id']), 'score': float(record['score']), 'class': record['metadata']['class']} 
                                 for record in results]
